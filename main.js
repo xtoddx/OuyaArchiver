@@ -47,29 +47,37 @@ async function getApkLink(app) {
 
 async function downloadScreenshots(app) {
     let appJSON
+    const appTitle = await filenamify(app.title, { replacement: '_' });
 
     try {
         appJSON = await request.get("https://devs.ouya.tv/api/v1/apps/" + app.uuid);
     } catch (error) {
+        console.log('XXX error in requesting app json for ', app.title)
         throw error
     }
 
     let screenshots = JSON.parse(appJSON).app.filepickerScreenshots
-
+    console.log("screenshots: ", screenshots)
     for (scr in screenshots) {
-        await download(screenshots[scr], "./downloads/" + app.title + "/screenshots/", "screenshot" + scr + ".jpg")
+        console.log("screen ", scr)
+        await download(screenshots[scr], "./downloads/" + appTitle + "/screenshots/", "screenshot" + scr + ".jpg")
     }
 
 }
 
 function download(link, path, filename) {
+    console.log(" -> asked to download ", link, " to filename ", filename, " at path ", path)
     return new Promise(async (resolve, reject) => {
 
         try {
-
-            await fs.mkdirSync(path, { recursive: true }, (err) => {
-                if (err) throw err;
-            });
+            fs.stat(path, (err, st) => {
+                if (err) {
+                    fs.mkdirSync(path, { recursive: true }, (err) => {
+                        console.log("!!!! error in mkdirSync");
+                        if (err) throw err;
+                    });
+                }
+            })
 
             const dl = new DownloaderHelper(link, path, { fileName: filename, override: true });
 
@@ -85,6 +93,7 @@ function download(link, path, filename) {
         } catch (error) {
 
             console.error("Error downloading " + link)
+            console.log(error);
             reject(error);
 
         }
@@ -104,21 +113,32 @@ async function main() {
             console.log("Downloading: " + app.title + " (" + (key + 1) + "/" + apps.apps.length + ")");
             try {
                 const appTitle = await filenamify(app.title, { replacement: '_' });
+                console.log("XXX title: ", appTitle)
                 if (!argv.a) {
+                    console.log("XXX downloading info.json for ", app.title)
                     await download("https://devs.ouya.tv/api/v1/apps/" + app.uuid, "./downloads/" + appTitle, "info.json")
-                    if (app.mainImageFullUrl != null) await download(app.mainImageFullUrl, "./downloads/" + appTitle, "mainImage.png")
-                    if (app.heroImage != null) await download(app.heroImage, "./downloads/" + appTitle, "heroImage.jpg")
+                    if (app.mainImageFullUrl != null) {
+                        console.log("getting main image for ", app.title)
+                        await download(app.mainImageFullUrl, "./downloads/" + appTitle, "mainImage.png")
+                    }
+                    if (app.heroImage != null) {
+                        console.log("downloading hero image for ", app.title)
+                        await download(app.heroImage, "./downloads/" + appTitle, "heroImage.jpg")
+                    }
                     await downloadScreenshots(app)
                 }
 
                 if (app.premium == false) {
                     var [downloadLink, filename] = await getApkLink(app).then(new Error());
+                    console.log("about to download to ./downloads/"+appTitle+"/"+filename+" from " + downloadLink)
                     await download(downloadLink, "./downloads/" + appTitle + "/", filename).then(() => {
+                        cosole.log("archived ", app.uuid)
                         archive[app.uuid] = true;
                         fs.writeFileSync("archive.json", JSON.stringify(archive));
                     })
 
                 } else {
+                    console.log("skipping premium app")
                     archive[app.uuid] = true;
                     fs.writeFileSync("archive.json", JSON.stringify(archive));
                 }
