@@ -60,7 +60,7 @@ async function downloadScreenshots(app) {
     console.log("screenshots: ", screenshots)
     for (scr in screenshots) {
         console.log("screen ", scr)
-        await download(screenshots[scr], "./downloads/" + appTitle + "/screenshots/", "screenshot" + scr + ".jpg")
+        await download(screenshots[scr], "./downloads/" + appTitle + "/screenshots", "screenshot" + scr + ".jpg")
     }
 
 }
